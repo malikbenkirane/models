@@ -1,4 +1,8 @@
 {
   "vertex_project": "your-gcp-project-id",
-  "mlx_host": "192.168.1.100"
+  "mlx_host": "192.168.1.100",
+  "mlx_hosts": {
+    "gemma": "192.168.1.101:8000",
+    "minicpm": "192.168.1.102:8001"
+  }
 }
