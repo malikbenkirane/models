@@ -57,7 +57,7 @@ This registry is personal, but the tool isn't. Fork it and swap in the models yo
 
 ```go
 newModel("Display Name", "litellm-key",
-    modelWithDeepinfra("provider/model-id"),   // or modelWithVertexai / modelWithMlx16
+    modelWithDeepinfra("provider/model-id"),   // or modelWithVertexai / modelWithMlx
     modelWithInput(1, 2),                       // $2/Mtok input  (offset, digits...)
     modelWithOutput(2, 1, 5),                   // $15/Mtok output
     modelWithCache(0, 1, 2),                    // $0.12/Mtok cache
@@ -72,7 +72,7 @@ newModel("Display Name", "litellm-key",
 |--------|----------|---------|
 | `modelWithDeepinfra(id)` | DeepInfra | API key via `DEEPINFRA_API_KEY` env var |
 | `modelWithVertexai(id)` | Vertex AI | Project from `config.json`; add `modelWithVertexLocation("global")` if needed |
-| `modelWithMlx16(id, port)` | local vLLM/MLX | Host from `config.json`; specify the server port (e.g. `8000`) |
+| `modelWithMlx(id, port)` | local vLLM/MLX | Endpoint resolved from `config.json` via `mlx_hosts` (named) or legacy `mlx_host` + `port`; tag with `modelWithMlxHost(key)` to select a named host |
 
 ### Pricing
 
