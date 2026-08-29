@@ -89,6 +89,65 @@ func TestDecimalPerTokenMarshalJSON(t *testing.T) {
 	}
 }
 
+func TestMlxEndpoint(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		cfg      configFile
+		key      string
+		port     int
+		expected string
+		ok       bool
+	}{
+		{
+			name:     "named host wins",
+			cfg:      configFile{MlxHosts: map[string]string{"gemma": "192.168.1.101:8000"}},
+			key:      "gemma",
+			port:     8000,
+			expected: "http://192.168.1.101:8000/v1",
+			ok:       true,
+		},
+		{
+			name:     "legacy host fallback uses model port",
+			cfg:      configFile{MlxHost: "192.168.1.100"},
+			key:      "gemma",
+			port:     8001,
+			expected: "http://192.168.1.100:8001/v1",
+			ok:       true,
+		},
+		{
+			name:     "named host preferred over legacy",
+			cfg:      configFile{MlxHost: "192.168.1.100", MlxHosts: map[string]string{"gemma": "10.0.0.1:8000"}},
+			key:      "gemma",
+			port:     9999,
+			expected: "http://10.0.0.1:8000/v1",
+			ok:       true,
+		},
+		{
+			name:     "missing named host with no legacy returns false",
+			cfg:      configFile{MlxHosts: map[string]string{"other": "10.0.0.2:8000"}},
+			key:      "gemma",
+			port:     8000,
+			expected: "",
+			ok:       false,
+		},
+		{
+			name:     "empty config returns false",
+			cfg:      configFile{},
+			key:      "gemma",
+			port:     8000,
+			expected: "",
+			ok:       false,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := test.cfg.mlxEndpoint(test.key, test.port)
+			if ok != test.ok || got != test.expected {
+				t.Fatalf("\nexp: %q %v\ngot: %q %v", test.expected, test.ok, got, ok)
+			}
+		})
+	}
+}
+
 func TestDecimalLess(t *testing.T) {
 	for _, test := range []struct {
 		name     string
