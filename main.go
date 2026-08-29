@@ -49,8 +49,12 @@ func run() error {
 			if err != nil {
 				return err
 			}
+			params, err := litellmModels(cfg)
+			if err != nil {
+				return err
+			}
 			var b bytes.Buffer
-			if err := litellm.ConfigJSON(&b, litellmModels(cfg)); err != nil {
+			if err := litellm.ConfigJSON(&b, params); err != nil {
 				return err
 			}
 			{

@@ -125,7 +125,7 @@ var myModels = []modelDescription{
 		modelWithVision()),
 }
 
-func litellmModels(cfg configFile) []litellm.ModelParams {
+func litellmModels(cfg configFile) ([]litellm.ModelParams, error) {
 	var models []litellm.ModelParams
 	for _, m := range myModels {
 		var opts []litellm.ModelOpt
@@ -135,8 +135,12 @@ func litellmModels(cfg configFile) []litellm.ModelParams {
 				litellm.ModelWithApikey("os.environ/DEEPINFRA_API_KEY"),
 				litellm.ModelWithDeepinfra(m.model))
 		case providerMlx16:
+			endpoint, ok := cfg.mlxEndpoint(m.mlxHost, m.port)
+			if !ok {
+				return nil, fmt.Errorf("mlx host %q not configured for %s", m.mlxHost, m.litellm)
+			}
 			opts = append(opts,
-				litellm.ModelWithVllm(m.model, fmt.Sprintf("http://%s:%d/v1", cfg.MlxHost, m.port)))
+				litellm.ModelWithVllm(m.model, endpoint))
 		case providerVertexAi:
 			opts = append(opts,
 				litellm.ModelWithVertexAi(cfg.VertexProject, m.model),
@@ -152,7 +156,7 @@ func litellmModels(cfg configFile) []litellm.ModelParams {
 		opts = append(opts, litellm.ModelWithPricing(m.input, m.output))
 		models = append(models, litellm.NewModel(m.litellm, opts...))
 	}
-	return models
+	return models, nil
 }
 
 type modelDescription struct {
