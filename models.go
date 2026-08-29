@@ -114,11 +114,13 @@ var myModels = []modelDescription{
 		modelWithInput(0, 1, 3),
 		modelWithOutput(0, 3, 8)),
 	newModel("Gemma-4-12B-it-4bitB [vllm-mlx/m1/16]", "mini-gemma-4-12B",
-		modelWithMlx16("mlx-community/Gemma-4-12B-it-4bit", 8000),
+		modelWithMlx("mlx-community/Gemma-4-12B-it-4bit", 8000),
+		modelWithMlxHost("gemma"),
 		modelWithMultimodalImageSupport(),
 		modelWithVision()),
 	newModel("MiniCPM-V-4.6-4bit [mlx_vlm.server/m1/16]", "mini-cpm-4-6",
-		modelWithMlx16("mlx-community/MiniCPM-V-4.6-4bit", 8001),
+		modelWithMlx("mlx-community/MiniCPM-V-4.6-4bit", 8001),
+		modelWithMlxHost("minicpm"),
 		modelWithMultimodalImageSupport(),
 		modelWithVision()),
 }
@@ -164,6 +166,7 @@ type modelDescription struct {
 	vision               bool
 	provider             modelProvider
 	port                 int
+	mlxHost              string
 }
 
 type modelProvider int
@@ -217,11 +220,17 @@ func modelWithMultimodalImageSupport() modelOpt {
 		return md
 	}
 }
-func modelWithMlx16(name string, port int) modelOpt {
+func modelWithMlx(name string, port int) modelOpt {
 	return func(md modelDescription) modelDescription {
 		md.provider = providerMlx16
 		md.port = port
 		md.model = name
+		return md
+	}
+}
+func modelWithMlxHost(key string) modelOpt {
+	return func(md modelDescription) modelDescription {
+		md.mlxHost = key
 		return md
 	}
 }
