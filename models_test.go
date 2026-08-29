@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"models/litellm"
 	"models/pricing"
+	"strings"
 	"testing"
 )
 
@@ -86,6 +89,37 @@ func TestDecimalPerTokenMarshalJSON(t *testing.T) {
 				t.Fatalf("\nexp: %q\ngot: %q", test.expected, got)
 			}
 		})
+	}
+}
+
+func TestLitellmModelsMlxMissingHost(t *testing.T) {
+	// No mlx_host or mlx_hosts configured: every MLX model must error.
+	if _, err := litellmModels(configFile{}); err == nil {
+		t.Fatalf("expected error when no MLX host is configured")
+	}
+}
+
+func TestLitellmModelsMlxNamedHost(t *testing.T) {
+	cfg := configFile{MlxHosts: map[string]string{
+		"gemma":   "192.168.1.101:8000",
+		"minicpm": "192.168.1.102:8001",
+	}}
+	params, err := litellmModels(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var b bytes.Buffer
+	if err := litellm.ConfigJSON(&b, params); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := b.String()
+	for _, want := range []string{
+		"http://192.168.1.101:8000/v1",
+		"http://192.168.1.102:8001/v1",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected api_base %q in output, got:\n%s", want, out)
+		}
 	}
 }
 
