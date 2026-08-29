@@ -9,7 +9,7 @@ The same registry (`myModels` in `models.go`) is projected into two output forma
 
 The module path is `models` and it is part of the larger `karen` repo. The git root is the parent `karen` directory.
 
-Deployment-specific values that must not be committed live in `config.json` (gitignored): `vertex_project` (GCP project ID for Vertex AI) and `mlx_host` (host of the local vLLM/MLX servers). `config.example.json` is the committed template. Only the `litellm` command reads `config.json` (via `loadConfig` in `config.go`); if the file is absent the values default to empty strings, so `opencode` and `pricing` work without it.
+Deployment-specific values that must not be committed live in `config.json` (gitignored): `vertex_project` (GCP project ID for Vertex AI), `mlx_host` (legacy single host of the local vLLM/MLX servers), and `mlx_hosts` (a map of `name -> "host:port"` for multiple named MLX servers). `config.example.json` is the committed template. Only the `litellm` command reads `config.json` (via `loadConfig` in `config.go`); if the file is absent the values default to empty strings, so `opencode` and `pricing` work without it. MLX endpoint resolution (`configFile.mlxEndpoint` in `config.go`) applies precedence: a named entry in `mlx_hosts` (port baked into the value) wins, then the legacy `mlx_host` combined with the model's per-entry `port`, then an error.
 
 ## Commands
 
@@ -36,7 +36,7 @@ Toolchain: Go 1.26.2 (matches `go.mod`). Dependencies: `github.com/spf13/cobra` 
 2. `main.go` wires three cobra subcommands:
    - `opencode`: iterates `myModels`, builds a `models` map (types in `opencode.go`) keyed by the litellm model name, marshals to indented JSON.
    - `litellm`: calls `loadConfig()` (in `config.go`) then `litellmModels(cfg)` (in `models.go`) to convert `myModels` → `[]litellm.ModelParams`, then `litellm.ConfigJSON` marshals to JSON, then `sigs.k8s.io/yaml.JSONToYAML` converts that JSON to YAML.
-   - `pricing`: iterates `myModels` and writes an aligned table via `text/tabwriter` (columns: model name, litellm key, provider, input/output/cache in USD per 1M tokens). Uses `modelProvider.String()` and `pricing.Decimal.String()`. Supports `--sort input|output|cache|name` (default `input`) and `--desc`; sorts on a **copy** of `myModels` via `sort.SliceStable` so the shared registry (and thus the `litellm` output order) is never mutated.
+   - `pricing`: iterates `myModels` and writes an aligned table via `text/tabwriter` (columns: model name, litellm key, provider, input/output/cache in USD per 1M tokens). Uses `modelProvider.String()` and `pricing.Decimal.String()`; for MLX models the public host key (from `modelWithMlxHost`) is appended to the provider cell (e.g. `vllm-mlx/gemma`) so the private IP from `config.json` is never shown. Supports `--sort input|output|cache|name` (default `input`) and `--desc`; sorts on a **copy** of `myModels` via `sort.SliceStable` so the shared registry (and thus the `litellm` output order) is never mutated.
 3. `pricing/decimal.go` provides `Decimal`, a hand-rolled decimal type whose `MarshalJSON` emits a bare JSON **number** (not a string). Prices are stored as **USD per 1 million tokens**; `Decimal.PerToken()` divides by 10^6 for the litellm output (which expects per-token costs). `Decimal.Less` provides pure numeric ordering (ignoring `perToken`) for the `pricing` command's `--sort` flag; `Decimal.String()` implements `fmt.Stringer` for the table cells.
 
 ### Package map
@@ -56,7 +56,7 @@ The registry uses **two coexisting styles**; prefer the builder for new entries.
 
 - Legacy (first 3 entries in `myModels`): plain `modelDescription{...}` struct literals.
 - Builder (all later entries): `newModel(name, litellmKey, opts...)` with functional options:
-  `modelWithInput`, `modelWithOutput`, `modelWithCache`, `modelWithDeepinfra`, `modelWithVertexai`, `modelWithMlx16`, `modelWithVertexLocation`, `modelWithVision`, `modelWithMultimodalImageSupport`.
+  `modelWithInput`, `modelWithOutput`, `modelWithCache`, `modelWithDeepinfra`, `modelWithVertexai`, `modelWithMlx`, `modelWithMlxHost`, `modelWithVertexLocation`, `modelWithVision`, `modelWithMultimodalImageSupport`.
 
 `newModel` zero-initializes `input`/`output`/`cache` to `NewDecimal(0)` (= `0`), so omitting a price yields `0`, not a missing field.
 
@@ -75,7 +75,7 @@ Provider selection happens in `litellmModels()` (`models.go`) and maps to litell
 
 - `providerDeepinfra`: model prefixed `deepinfra/`, api_key = `os.environ/DEEPINFRA_API_KEY` (litellm env-reference syntax, not a literal key).
 - `providerVertexAi`: model prefixed `vertex_ai/`, `vertex_project` read from `config.json` (`vertex_project` key), optional `vertex_ai_location` via `modelWithVertexLocation`.
-- `providerMlx16` (local vLLM/MLX servers): model prefixed `hosted_vllm/`, `api_base` set to `http://<mlx_host>:<port>/v1` where `mlx_host` comes from `config.json` and the port from `modelWithMlx16(name, port)` (used ports: 8000, 8001).
+- `providerMlx16` (local vLLM/MLX servers): model prefixed `hosted_vllm/`, `api_base` resolved by `configFile.mlxEndpoint(m.mlxHost, m.port)`. A named host key (set via `modelWithMlxHost(key)`) looks up `mlx_hosts[key]` and bakes the port into the URL; with no matching named host it falls back to the legacy `mlx_host` + the port from `modelWithMlx(name, port)`. If neither is configured, `litellmModels` returns an error instead of emitting a broken `http://:port/v1`.
 
 All providers always emit `ModelWithPricing(input, output)`; vision is appended only when `m.vision` is true.
 
