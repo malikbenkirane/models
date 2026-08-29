@@ -94,8 +94,12 @@ func run() error {
 			tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 			fmt.Fprintln(tw, "MODEL\tLITELLM KEY\tPROVIDER\tINPUT $/Mtok\tOUTPUT $/Mtok\tCACHE $/Mtok")
 			for _, m := range rows {
+				provider := m.provider.String()
+				if m.provider == providerMlx16 && m.mlxHost != "" {
+					provider += "/" + m.mlxHost
+				}
 				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
-					m.name, m.litellm, m.provider, m.input, m.output, m.cache)
+					m.name, m.litellm, provider, m.input, m.output, m.cache)
 			}
 			return tw.Flush()
 		},
