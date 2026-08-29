@@ -45,11 +45,19 @@ go run . pricing --desc         # sort descending
 ```json
 {
   "vertex_project": "your-gcp-project-id",
-  "mlx_host": "192.168.1.100"
+  "mlx_host": "192.168.1.100",
+  "mlx_hosts": {
+    "gemma": "192.168.1.101:8000",
+    "minicpm": "192.168.1.102:8001"
+  }
 }
 ```
 
 Copy `config.example.json` to `config.json` and fill in your values. `opencode` and `pricing` don't need it; if `config.json` is absent `litellm` still runs with empty values.
+
+MLX endpoints resolve in this order: a named entry in `mlx_hosts` (matching `modelWithMlxHost(key)`, port baked into the value) wins, then the legacy `mlx_host` combined with the model's `port` from `modelWithMlx(name, port)`, otherwise `litellm` errors out instead of emitting a broken URL.
+
+For backward compatibility, the single-host `mlx_host` key still works on its own; `mlx_hosts` is optional and only needed when running multiple named servers.
 
 ## Make it yours
 
