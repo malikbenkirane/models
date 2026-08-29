@@ -64,7 +64,7 @@ The registry uses **two coexisting styles**; prefer the builder for new entries.
 
 This is the most subtle part of the registry:
 
-- `modelWithVision()` sets `vision=true`, which **only** affects the litellm output (`model_info.supports_vision`). It has **no effect** on the opencode output.
+- `modelWithVision()` sets `vision=true`, which **only** affects the litellm output (`model_info.supports_vision`). It has **no effect** on the opencode output. Caveat: the flag is emitted into the config but the LiteLLM proxy does not currently honor it (see README "Known issues"), so it does not by itself enable working vision support.
 - `modelWithMultimodalImageSupport()` sets `modalities` (input: text+image, output: text) and `attachment=true`, which **only** affect the opencode output. It does **not** set `vision`, so litellm won't mark `supports_vision`.
 
 A model that handles images in **both** configs needs **both** options (see "Claude 4.6 [Vertex AI]"). Using only one silently leaves the other config without the capability. Existing entries are intentionally inconsistent here (e.g. "Gemma 4 31B-it" has `modelWithVision()` only → no opencode modalities; "Claude Opus 4.8" has `modelWithMultimodalImageSupport()` only → no litellm vision flag). Match the intent of the specific model when editing.
@@ -112,7 +112,7 @@ Gotchas:
 ## Output-format gotchas
 
 - **Why JSON→YAML instead of direct `yaml.Marshal`:** the litellm command encodes to JSON (`litellm.ConfigJSON`) then converts with `sigs.k8s.io/yaml.JSONToYAML`. `sigs.k8s.io/yaml` marshals via the JSON representation, so it **preserves struct field order** (as defined by `json` tags). Switching to `gopkg.in/yaml.v2` directly would **alphabetize keys** and churn the generated `config.yaml` diffs. Keep the JSON→YAML path.
-- The opencode output is a `map[string]model` **keyed by `m.litellm`** (the litellm model name). If two registry entries ever share the same litellm key, the opencode map silently keeps the **last** one. The litellm output is a `model_list` slice, so it does **not** dedupe — duplicate keys produce duplicate entries. The registry currently has upstream models referenced by more than one entry under different litellm keys (e.g. `Qwen/Qwen3-Max-Thinking` appears as both `di-q3-max-thinking` and `di-qwen3-max-thinking` with different pricing); this is intentional, not a bug.
+- The opencode output is a `map[string]model` **keyed by `m.litellm`** (the litellm model name). If two registry entries ever share the same litellm key, the opencode map silently keeps the **last** one. The litellm output is a `model_list` slice, so it does **not** dedupe — duplicate keys produce duplicate entries. The registry currently has upstream models referenced by more than one entry under different litellm keys (e.g. `Qwen/Qwen3-Max-Thinking` appears as both `di-q3-max-thinking` and `di-qwen3-max-thinking` — same input/output price, but only the latter specifies cache pricing); this is intentional, not a bug.
 - In `main.go`'s litellm branch, `b` (a `bytes.Buffer`) is shadowed by a new `b []byte` from `yaml.JSONToYAML(b.Bytes())` inside an inner block — valid but easy to misread.
 - The litellm output hardcodes `litellm_settings`: `drop_params: true` and `proxy_handler_instance: "custom_callbacks.proxy_handler_instance"` (a reference to the parent project's `custom_callbacks.py`).
 
@@ -120,4 +120,4 @@ Gotchas:
 
 - `models_test.go` is table-driven (`t.Run` with empty names) and covers only `pricing.Decimal` — `MarshalJSON` (both the per-million form and the `.PerToken()` form) and `Less` (numeric ordering). It lives in package `main` and is the **only** package with tests (`pricing`, `litellm`, `litellm/logs/request` report `[no test files]`).
 - When changing `Decimal` behavior, update/extend these cases; they are the de facto spec for the encoding and ordering.
-- Tests assert exact string output via `t.Fatalf("\nexp: %q\ngot: %q", ...)`.
+- The `MarshalJSON` tests assert exact string output via `t.Fatalf("\nexp: %q\ngot: %q", ...)`; the `Less` test asserts boolean ordering via `t.Fatalf("\nexp: %v\ngot: %v", ...)`.
